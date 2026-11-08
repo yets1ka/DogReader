@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>DogReader - iPad Doc & Text Reader</title>
+    <!-- Mammoth.js สำหรับแปลง .docx, รูปภาพ และสไตล์สี -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+    <style>
+        :root {
+            --bg-color: #f7f3ec;
+            --reader-bg: #ffffff;
+            --text-color: #2c2c2c;
+            --accent-color: #d97706;
+            --border-color: #e5e7eb;
+            --font-size: 18px;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        header {
+            background: #fff;
+            border-bottom: 1px solid var(--border-color);
+            padding: 12px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+            z-index: 10;
+        }
+        .logo { font-weight: bold; font-size: 1.1rem; color: #1f2937; display: flex; align-items: center; gap: 6px; }
+        .controls { display: flex; gap: 10px; align-items: center; }
+        button, label.upload-btn {
+            background: #fff;
+            border: 1px solid #d1d5db;
+            padding: 8px 14px;
+            border-radius: 8px;
+            font-size: 0.95rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+        }
+        button:hover, label.upload-btn:hover { background: #f3f4f6; border-color: #9ca3af; }
+        label.upload-btn { background: var(--accent-color); color: #fff; border: none; }
+        label.upload-btn:hover { background: #b45309; }
+        #fileInput { display: none; }
+
+        .main-container {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            overflow: hidden;
+        }
+        .book-wrapper {
+            background: var(--reader-bg);
+            width: 100%;
+            max-width: 900px;
+            height: 100%;
+            max-height: 85vh;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.08);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            position: relative;
+        }
+        .book-content {
+            flex: 1;
+            padding: 40px;
+            overflow-y: auto;
+            font-size: var(--font-size);
+            line-height: 1.8;
+        }
+        .book-content img {
+            max-width: 100%;
+            height: auto;
+            display: block;
+            margin: 20px auto;
+            border-radius: 6px;
+        }
+        .welcome-screen {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            text-align: center;
+            color: #6b7280;
+            gap: 15px;
+        }
+        footer {
+            padding: 10px 20px;
+            background: #fff;
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.9rem;
+            color: #4b5563;
+        }
+        /* แนวนอนจำลองหน้าคู่ */
+        @media (orientation: landscape) {
+            .book-content {
+                column-count: 2;
+                column-gap: 50px;
+                column-rule: 1px solid var(--border-color);
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="logo">🐶 DogReader (iPad Edition)</div>
+        <div class="controls">
+            <button onclick="changeFontSize(-2)">A-</button>
+            <button onclick="changeFontSize(2)">A+</button>
+            <label class="upload-btn">
+                📂 เปิดไฟล์เอกสาร
+                <input type="file" id="fileInput" accept=".docx, .txt">
+            </label>
+        </div>
+    </header>
+
+    <div class="main-container">
+        <div class="book-wrapper">
+            <div id="readerContent" class="book-content">
+                <div class="welcome-screen">
+                    <h2>ยินดีต้อนรับสู่ DogReader</h2>
+                    <p>เลือกไฟล์ .docx หรือ .txt เพื่อเริ่มอ่าน พร้อมปรับขนาดตัวหนังสือและคงสีสันในเอกสาร</p>
+                </div>
+            </div>
+            <footer>
+                <span id="fileName">ยังไม่ได้เปิดไฟล์</span>
+                <span id="pageInfo">DogReader v1.0</span>
+            </footer>
+        </div>
+    </div>
+
+    <script>
+        let currentFontSize = 18;
+
+        function changeFontSize(amount) {
+            currentFontSize = Math.max(12, Math.min(36, currentFontSize + amount));
+            document.getElementById('readerContent').style.fontSize = currentFontSize + 'px';
+        }
+
+        document.getElementById('fileInput').addEventListener('change', function(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            document.getElementById('fileName').innerText = file.name;
+            const reader = new FileReader();
+
+            if (file.name.endsWith('.docx')) {
+                reader.readAsArrayBuffer(file);
+                reader.onload = function(e) {
+                    const arrayBuffer = e.target.result;
+                    
+                    // ตั้งค่าแปลง .docx ให้รักษา Style สีตัวอักษรและรูปภาพภายใน
+                    const options = {
+                        styleMap: [
+                            "p[style-name='Heading 1'] => h1:fresh",
+                            "p[style-name='Heading 2'] => h2:fresh"
+                        ],
+                        transformDocument: mammoth.transforms.paragraph(function(paragraph) {
+                            return paragraph;
+                        })
+                    };
+
+                    mammoth.convertToHtml({ arrayBuffer: arrayBuffer }, options)
+                        .then(displayResult)
+                        .catch(handleError);
+                };
+            } else if (file.name.endsWith('.txt')) {
+                reader.readAsText(file, 'UTF-8');
+                reader.onload = function(e) {
+                    const text = e.target.result;
+                    const htmlText = text.replace(/\n/g, '<br>');
+                    document.getElementById('readerContent').innerHTML = `<div style="white-space: pre-wrap;">${htmlText}</div>`;
+                };
+            }
+        });
+
+        function displayResult(result) {
+            document.getElementById('readerContent').innerHTML = result.value;
+        }
+
+        function handleError(err) {
+            document.getElementById('readerContent').innerHTML = `<p style="color: red; text-align: center;">เกิดข้อผิดพลาดในการเปิดไฟล์: ${err.message}</p>`;
+        }
+    </script>
+</body>
+</html>
