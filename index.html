@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>DogReader - iPad Doc & Text Reader</title>
-    <!-- Mammoth.js สำหรับแปลง .docx, รูปภาพ และสไตล์สี -->
+    <!-- Mammoth.js -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
     <style>
         :root {
@@ -81,6 +81,11 @@
             overflow-y: auto;
             font-size: var(--font-size);
             line-height: 1.8;
+            word-break: break-word;
+        }
+        /* บังคับให้รักษาค่าสีและสไตล์ที่ติดมากับตัวอักษร */
+        .book-content span, .book-content p {
+            color: inherit;
         }
         .book-content img {
             max-width: 100%;
@@ -138,12 +143,12 @@
             <div id="readerContent" class="book-content">
                 <div class="welcome-screen">
                     <h2>ยินดีต้อนรับสู่ DogReader</h2>
-                    <p>เลือกไฟล์ .docx หรือ .txt เพื่อเริ่มอ่าน พร้อมปรับขนาดตัวหนังสือและคงสีสันในเอกสาร</p>
+                    <p>เลือกไฟล์ .docx หรือ .txt เพื่อเริ่มอ่าน พร้อมคงสีตัวอักษรและรูปภาพ</p>
                 </div>
             </div>
             <footer>
                 <span id="fileName">ยังไม่ได้เปิดไฟล์</span>
-                <span id="pageInfo">DogReader v1.0</span>
+                <span id="pageInfo">DogReader v1.1</span>
             </footer>
         </div>
     </div>
@@ -168,19 +173,27 @@
                 reader.onload = function(e) {
                     const arrayBuffer = e.target.result;
                     
-                    // ตั้งค่าแปลง .docx ให้รักษา Style สีตัวอักษรและรูปภาพภายใน
+                    // ปรับแต่ง options เพื่อแปลงสีและสไตล์ข้อความจาก Word ให้ติดมาด้วย
                     const options = {
                         styleMap: [
                             "p[style-name='Heading 1'] => h1:fresh",
-                            "p[style-name='Heading 2'] => h2:fresh"
+                            "p[style-name='Heading 2'] => h2:fresh",
+                            "r[style-name='Strong'] => strong"
                         ],
-                        transformDocument: mammoth.transforms.paragraph(function(paragraph) {
-                            return paragraph;
+                        includeDefaultStyleMap: true,
+                        convertImage: mammoth.images.imgElement(function(image) {
+                            return image.read("base64").then(function(imageBuffer) {
+                                return {
+                                    src: "data:" + image.contentType + ";base64," + imageBuffer
+                                };
+                            });
                         })
                     };
 
                     mammoth.convertToHtml({ arrayBuffer: arrayBuffer }, options)
-                        .then(displayResult)
+                        .then(function(result) {
+                            document.getElementById('readerContent').innerHTML = result.value;
+                        })
                         .catch(handleError);
                 };
             } else if (file.name.endsWith('.txt')) {
@@ -192,10 +205,6 @@
                 };
             }
         });
-
-        function displayResult(result) {
-            document.getElementById('readerContent').innerHTML = result.value;
-        }
 
         function handleError(err) {
             document.getElementById('readerContent').innerHTML = `<p style="color: red; text-align: center;">เกิดข้อผิดพลาดในการเปิดไฟล์: ${err.message}</p>`;
