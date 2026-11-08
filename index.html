@@ -28,7 +28,7 @@
         header {
             background: #fff;
             border-bottom: 1px solid var(--border-color);
-            padding: 12px 20px;
+            padding: 10px 20px;
             display: flex;
             justify-content: space-between;
             align-items: center;
@@ -36,13 +36,13 @@
             z-index: 10;
         }
         .logo { font-weight: bold; font-size: 1.1rem; color: #1f2937; display: flex; align-items: center; gap: 6px; }
-        .controls { display: flex; gap: 10px; align-items: center; }
+        .controls { display: flex; gap: 8px; align-items: center; }
         button, label.upload-btn {
             background: #fff;
             border: 1px solid #d1d5db;
-            padding: 8px 14px;
+            padding: 6px 12px;
             border-radius: 8px;
-            font-size: 0.95rem;
+            font-size: 0.9rem;
             cursor: pointer;
             transition: all 0.2s;
             display: inline-flex;
@@ -59,15 +59,16 @@
             display: flex;
             justify-content: center;
             align-items: center;
-            padding: 20px;
+            padding: 15px;
             overflow: hidden;
         }
+        
         .book-wrapper {
             background: var(--reader-bg);
             width: 100%;
             max-width: 900px;
             height: 100%;
-            max-height: 85vh;
+            max-height: 82vh;
             border-radius: 12px;
             box-shadow: 0 10px 25px rgba(0,0,0,0.08);
             display: flex;
@@ -75,25 +76,26 @@
             overflow: hidden;
             position: relative;
         }
+
         .book-content {
             flex: 1;
             padding: 40px;
-            overflow-y: auto;
             font-size: var(--font-size);
             line-height: 1.8;
+            overflow-y: auto;
             word-break: break-word;
         }
-        /* บังคับให้รักษาค่าสีและสไตล์ที่ติดมากับตัวอักษร */
-        .book-content span, .book-content p {
-            color: inherit;
-        }
+
         .book-content img {
             max-width: 100%;
+            max-height: 40vh;
             height: auto;
             display: block;
-            margin: 20px auto;
+            margin: 15px auto;
             border-radius: 6px;
+            object-fit: contain;
         }
+
         .welcome-screen {
             display: flex;
             flex-direction: column;
@@ -104,35 +106,33 @@
             color: #6b7280;
             gap: 15px;
         }
-        footer {
-            padding: 10px 20px;
-            background: #fff;
-            border-top: 1px solid var(--border-color);
+
+        .page-nav {
             display: flex;
             justify-content: space-between;
             align-items: center;
+            padding: 10px 20px;
+            background: #fff;
+            border-top: 1px solid var(--border-color);
             font-size: 0.9rem;
             color: #4b5563;
         }
-        /* แนวนอนจำลองหน้าคู่ */
-        @media (orientation: landscape) {
-            .book-content {
-                column-count: 2;
-                column-gap: 50px;
-                column-rule: 1px solid var(--border-color);
-            }
+        .page-nav button {
+            background: #f3f4f6;
+            font-weight: bold;
         }
     </style>
 </head>
 <body>
 
     <header>
-        <div class="logo">🐶 DogReader (iPad Edition)</div>
+        <div class="logo">🐶 DogReader</div>
         <div class="controls">
             <button onclick="changeFontSize(-2)">A-</button>
             <button onclick="changeFontSize(2)">A+</button>
+            <button onclick="fitToScreen()">🔲 ฟิตหน้าจอ</button>
             <label class="upload-btn">
-                📂 เปิดไฟล์เอกสาร
+                📂 เปิดไฟล์
                 <input type="file" id="fileInput" accept=".docx, .txt">
             </label>
         </div>
@@ -143,21 +143,29 @@
             <div id="readerContent" class="book-content">
                 <div class="welcome-screen">
                     <h2>ยินดีต้อนรับสู่ DogReader</h2>
-                    <p>เลือกไฟล์ .docx หรือ .txt เพื่อเริ่มอ่าน พร้อมคงสีตัวอักษรและรูปภาพ</p>
+                    <p>เลือกไฟล์ .docx หรือ .txt เพื่อเริ่มอ่าน</p>
                 </div>
             </div>
-            <footer>
-                <span id="fileName">ยังไม่ได้เปิดไฟล์</span>
-                <span id="pageInfo">DogReader v1.1</span>
-            </footer>
+            
+            <div class="page-nav">
+                <button onclick="prevPage()">◀ หน้าก่อนหน้า</button>
+                <span id="pageInfo">ยังไม่ได้เปิดไฟล์</span>
+                <button onclick="nextPage()">หน้าถัดไป ▶</button>
+            </div>
         </div>
     </div>
 
     <script>
         let currentFontSize = 18;
+        let currentFileName = "";
 
         function changeFontSize(amount) {
             currentFontSize = Math.max(12, Math.min(36, currentFontSize + amount));
+            document.getElementById('readerContent').style.fontSize = currentFontSize + 'px';
+        }
+
+        function fitToScreen() {
+            currentFontSize = 18;
             document.getElementById('readerContent').style.fontSize = currentFontSize + 'px';
         }
 
@@ -165,34 +173,18 @@
             const file = event.target.files[0];
             if (!file) return;
 
-            document.getElementById('fileName').innerText = file.name;
+            currentFileName = file.name;
+            document.getElementById('pageInfo').innerText = `กำลังโหลด ${file.name}...`;
+
             const reader = new FileReader();
 
             if (file.name.endsWith('.docx')) {
                 reader.readAsArrayBuffer(file);
                 reader.onload = function(e) {
-                    const arrayBuffer = e.target.result;
-                    
-                    // ปรับแต่ง options เพื่อแปลงสีและสไตล์ข้อความจาก Word ให้ติดมาด้วย
-                    const options = {
-                        styleMap: [
-                            "p[style-name='Heading 1'] => h1:fresh",
-                            "p[style-name='Heading 2'] => h2:fresh",
-                            "r[style-name='Strong'] => strong"
-                        ],
-                        includeDefaultStyleMap: true,
-                        convertImage: mammoth.images.imgElement(function(image) {
-                            return image.read("base64").then(function(imageBuffer) {
-                                return {
-                                    src: "data:" + image.contentType + ";base64," + imageBuffer
-                                };
-                            });
-                        })
-                    };
-
-                    mammoth.convertToHtml({ arrayBuffer: arrayBuffer }, options)
+                    mammoth.convertToHtml({ arrayBuffer: e.target.result })
                         .then(function(result) {
                             document.getElementById('readerContent').innerHTML = result.value;
+                            document.getElementById('pageInfo').innerText = `ไฟล์: ${currentFileName}`;
                         })
                         .catch(handleError);
                 };
@@ -202,12 +194,24 @@
                     const text = e.target.result;
                     const htmlText = text.replace(/\n/g, '<br>');
                     document.getElementById('readerContent').innerHTML = `<div style="white-space: pre-wrap;">${htmlText}</div>`;
+                    document.getElementById('pageInfo').innerText = `ไฟล์: ${currentFileName}`;
                 };
             }
         });
 
+        function nextPage() {
+            const content = document.getElementById('readerContent');
+            content.scrollBy({ top: 400, behavior: 'smooth' });
+        }
+
+        function prevPage() {
+            const content = document.getElementById('readerContent');
+            content.scrollBy({ top: -400, behavior: 'smooth' });
+        }
+
         function handleError(err) {
             document.getElementById('readerContent').innerHTML = `<p style="color: red; text-align: center;">เกิดข้อผิดพลาดในการเปิดไฟล์: ${err.message}</p>`;
+            document.getElementById('pageInfo').innerText = 'เปิดไฟล์ไม่สำเร็จ';
         }
     </script>
 </body>
